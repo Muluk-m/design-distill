@@ -3,18 +3,12 @@
   "version": "0.3.0",
   "description": "Distill any website's design system into DESIGN.md, then generate code that actually matches",
   "type": "module",
-  "bin": {
-    "design-distill": "./dist/cli.mjs"
-  },
   "files": [
-    "dist",
+    "scripts",
     "skills",
     "bundled"
   ],
   "scripts": {
-    "build": "tsdown",
-    "prepare": "tsdown",
-    "prepublishOnly": "tsdown",
     "test": "vitest run"
   },
   "engines": {
@@ -23,7 +17,7 @@
   "keywords": [
     "design-system",
     "design-tokens",
-    "cli",
+    "skill",
     "ai-agent",
     "claude-code",
     "design-distill"
@@ -34,12 +28,10 @@
     "url": "https://github.com/Muluk-m/design-distill"
   },
   "dependencies": {
-    "commander": "^13.0.0"
+    "playwright": "^1.49.0"
   },
   "devDependencies": {
     "@types/node": "^25.5.2",
-    "tsdown": "^0.21.7",
-    "typescript": "^6.0.2",
     "vitest": "^4.1.2"
   }
 }

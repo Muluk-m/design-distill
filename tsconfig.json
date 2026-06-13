@@ -7,10 +7,10 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
-    "outDir": "dist",
-    "rootDir": "src",
-    "declaration": false,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["src"]
+  "include": ["tests", "scripts"]
 }
