@@ -1,76 +1,66 @@
 import { describe, it, expect } from "vitest";
-import { isDark, contrastColor, surfaceColor, deltaE } from "../../src/lib/color.js";
+import {
+  parseColor,
+  alphaOf,
+  isOpaque,
+  isColor,
+  isDark,
+  deltaE,
+  hueFamily,
+  // @ts-expect-error - plain .mjs module without types
+} from "../../scripts/lib/color.mjs";
 
-describe("isDark", () => {
-  it("returns true for black", () => {
-    expect(isDark("#000000")).toBe(true);
+describe("parseColor", () => {
+  it("parses #rrggbb, #rgb, rgb(), rgba()", () => {
+    expect(parseColor("#5e6ad2")).toEqual([94, 106, 210]);
+    expect(parseColor("#fff")).toEqual([255, 255, 255]);
+    expect(parseColor("rgb(94, 106, 210)")).toEqual([94, 106, 210]);
+    expect(parseColor("rgba(0,0,0,0.5)")).toEqual([0, 0, 0]);
   });
-
-  it("returns true for dark background #0a0a0a", () => {
-    expect(isDark("#0a0a0a")).toBe(true);
+  it("returns null for junk", () => {
+    expect(parseColor("not-a-color")).toBeNull();
+    expect(parseColor(123 as any)).toBeNull();
   });
+});
 
-  it("returns false for white", () => {
+describe("alphaOf / isOpaque", () => {
+  it("reads the alpha channel", () => {
+    expect(alphaOf("rgba(255,255,255,0)")).toBe(0);
+    expect(alphaOf("rgba(0,0,0,0.4)")).toBe(0.4);
+    expect(alphaOf("#000000")).toBe(1);
+    expect(alphaOf("rgb(0,0,0)")).toBe(1);
+  });
+  it("treats near-transparent colors as non-opaque", () => {
+    expect(isOpaque("rgba(255,255,255,0)")).toBe(false);
+    expect(isOpaque("rgba(0,0,0,0.2)")).toBe(false);
+    expect(isOpaque("#5e6ad2")).toBe(true);
+  });
+});
+
+describe("hueFamily", () => {
+  it("classifies status hues and neutrals", () => {
+    expect(hueFamily("#eb5757")).toBe("red");
+    expect(hueFamily("#fc7840")).toBe("orange");
+    expect(hueFamily("#27a644")).toBe("green");
+    expect(hueFamily("#08090a")).toBe("neutral");
+    expect(hueFamily("#ffffff")).toBe("neutral");
+  });
+  it("works on rgb() input too", () => {
+    expect(hueFamily("rgb(235,87,87)")).toBe("red");
+  });
+});
+
+describe("isDark / deltaE / isColor", () => {
+  it("isDark by luminance", () => {
+    expect(isDark("#08090a")).toBe(true);
     expect(isDark("#ffffff")).toBe(false);
   });
-
-  it("returns false for light gray", () => {
-    expect(isDark("#fafafa")).toBe(false);
+  it("deltaE is ~0 for equal colors across formats", () => {
+    expect(deltaE("#5e6ad2", "rgb(94,106,210)")).toBe(0);
   });
-
-  it("returns true for mid-dark color", () => {
-    expect(isDark("#1a1a2e")).toBe(true);
-  });
-});
-
-describe("contrastColor", () => {
-  it("returns light text for dark backgrounds", () => {
-    expect(contrastColor("#000000")).toBe("rgba(255,255,255,0.9)");
-    expect(contrastColor("#0a0a0a")).toBe("rgba(255,255,255,0.9)");
-  });
-
-  it("returns dark text for light backgrounds", () => {
-    expect(contrastColor("#ffffff")).toBe("rgba(0,0,0,0.85)");
-    expect(contrastColor("#fafafa")).toBe("rgba(0,0,0,0.85)");
-  });
-});
-
-describe("surfaceColor", () => {
-  it("lightens dark background by +12 per channel", () => {
-    const result = surfaceColor("#0a0a0a", true);
-    // 0x0a + 12 = 22 = 0x16
-    expect(result).toBe("#161616");
-  });
-
-  it("returns #ffffff for light mode", () => {
-    expect(surfaceColor("#fafafa", false)).toBe("#ffffff");
-  });
-
-  it("clamps at 255", () => {
-    const result = surfaceColor("#fafafa", true);
-    // 0xfa (250) + 12 = 262 → clamped to 255 = 0xff
-    expect(result).toBe("#ffffff");
-  });
-});
-
-describe("deltaE", () => {
-  it("returns 0 for identical colors", () => {
-    expect(deltaE("#5E6AD2", "#5E6AD2")).toBe(0);
-  });
-
-  it("returns max distance for black vs white", () => {
-    const d = deltaE("#000000", "#ffffff");
-    // sqrt(255^2 * 3) ≈ 441.67
-    expect(d).toBeCloseTo(441.67, 0);
-  });
-
-  it("returns reasonable distance for similar colors", () => {
-    const d = deltaE("#5E6AD2", "#5E6AD3");
-    expect(d).toBeGreaterThan(0);
-    expect(d).toBeLessThan(5);
-  });
-
-  it("returns NaN for invalid hex", () => {
-    expect(deltaE("invalid", "#000000")).toBeNaN();
+  it("isColor accepts hex + rgb, rejects junk", () => {
+    expect(isColor("#fff")).toBe(true);
+    expect(isColor("rgb(1,2,3)")).toBe(true);
+    expect(isColor("banana")).toBe(false);
   });
 });

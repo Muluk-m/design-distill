@@ -25,11 +25,15 @@ Design Distill solves this by extracting the *real* design tokens from a live si
 # Install skills (design-distill + design-apply)
 npx skills add Muluk-m/design-distill
 
-# Install CLI + dependencies (dembrandt + Playwright)
-npx design-distill init
+# One-time bootstrap: ensures a browser + seeds the bundled styles
+node scripts/setup.mjs
 ```
 
-After `init`, the `design-distill` CLI is available globally. 5 bundled design systems (GitHub, Linear, Notion, Stripe, Vercel) are pre-installed.
+The skill is self-contained — there's no global CLI to install. `setup.mjs`
+**reuses a browser you already have** (system Chrome/Edge, or a CDP endpoint via
+`DESIGN_DISTILL_CDP`) and only downloads Chromium when none is found. 5 bundled
+design systems (GitHub, Linear, Notion, Stripe, Vercel) are seeded into the
+library (`~/.config/design-distill/`, overridable via `DESIGN_DISTILL_HOME`).
 
 ## Two Skills, One Library
 
@@ -69,49 +73,57 @@ design-apply 用 linear 做个博客主页    # load from library by name
 design-apply 做个登录页                # auto-loads local ./DESIGN.md
 ```
 
-### CLI — Manage Your Library
+### Library & primitives
+
+The library is plain files under `~/.config/design-distill/<name>/`
+(`tokens.json` is canonical, `DESIGN.md` is the rendered view) — list/show/remove
+with ordinary file commands (`ls`, `cat`, `rm`). The skill ships bundled
+primitives instead of a global CLI:
 
 ```bash
-design-distill list                  # list saved styles
-design-distill list --json           # JSON output
-design-distill show <name>           # display DESIGN.md content
-design-distill path <name>           # output filesystem path
-design-distill remove <name>         # delete a style
-design-distill diff <name>           # compare saved vs. live site
-design-distill preview <name>        # visual HTML preview in browser
+node scripts/setup.mjs --probe        # report capability tier + browser source
+node scripts/extract.mjs <url>        # extract a token set (MCP → dembrandt → native)
+node scripts/build-design.mjs --out <dir>   # normalize → tokens.json + DESIGN.md
+node scripts/screenshot.mjs <url> --out <dir>
+node scripts/compare.mjs <ref.json> <cand.json>
+node scripts/diff.mjs <name>          # drift: saved vs. live source
+node scripts/verify.mjs <tokens.json> <output>   # visual-verification loop round
 ```
 
 ## Architecture
 
+No global CLI — the skills are self-contained and call zero-build `.mjs`
+primitives directly. One browser dependency (reused from the system or
+downloaded once).
+
 ```
 design-distill/
-├── src/
-│   ├── cli.ts                 ← entry point (TypeScript, built with tsdown)
-│   ├── types.ts               ← shared type definitions
-│   ├── commands/              ← init, list, show, remove, path, diff, preview
-│   └── lib/
-│       ├── store.ts           ← global library read/write (~/.config/design-distill/)
-│       ├── parsers.ts         ← DESIGN.md section extractors
-│       └── color.ts           ← color utilities (contrast, deltaE, etc.)
+├── scripts/                   ← bundled primitives (run via `node`, no build step)
+│   ├── setup.mjs              ← bootstrap: reuse/ensure a browser + seed styles
+│   ├── extract.mjs            ← tokens (MCP → pinned dembrandt → native fallback)
+│   ├── build-design.mjs       ← normalize → tokens.json (canonical) + DESIGN.md
+│   ├── screenshot.mjs         ← full-page / multi-viewport / light-dark capture
+│   ├── compare.mjs            ← per-category thresholded fidelity diff
+│   ├── verify.mjs             ← closed visual-verification loop (one round)
+│   ├── diff.mjs · preview.mjs ← drift detection · HTML preview
+│   └── lib/                   ← target, color, tokenset, semantic, wcag, merge, probe …
 ├── skills/
-│   ├── design-distill/        ← extraction skill
-│   └── design-apply/          ← generation skill
-├── tests/
-│   ├── unit/                  ← parsers, color, design-header, generate-html
-│   └── integration/           ← store round-trip, CLI e2e
-├── bundled/                   ← pre-bundled snapshots (github, linear, notion, stripe, vercel)
+│   ├── design-distill/        ← extraction skill (+ references/template.md)
+│   └── design-apply/          ← generation skill (closed visual loop)
+├── tests/                     ← vitest (unit + browser integration)
+├── bundled/                   ← snapshots (github, linear, notion, stripe, vercel)
 └── package.json
 ```
 
-**CLI** handles data operations (storage, dependencies, library management).
-**Skills** handle AI behavior (extraction intelligence, style-constrained generation).
-**DESIGN.md** is the interchange format between them.
+**Skills** handle AI behavior; **bundled scripts** handle deterministic work
+(extraction, capture, comparison); **tokens.json** is canonical and **DESIGN.md**
+is its rendered view.
 
 ## Development
 
 ```bash
-npm run build          # build with tsdown → dist/cli.mjs
-npm test               # run 70 tests (vitest)
+npm test               # vitest (unit + browser integration via system Chrome/Playwright)
+node scripts/setup.mjs --probe   # show capability tier + browser source
 ```
 
 ## Compatibility

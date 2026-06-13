@@ -1,24 +1,56 @@
 ---
 name: design-distill
 description: |
-  Extract a design system from a website URL or local project into a structured DESIGN.md document
-  (compatible with Google Stitch DESIGN.md specification). Saves to global library only
-  (~/.config/design-distill/<name>/DESIGN.md), never to the project root.
+  Extract a design system from a website URL or local project into a structured token set
+  (tokens.json, canonical) + a rendered DESIGN.md (Google Stitch-compatible) with semantic
+  roles, essence, and a WCAG audit. Saves to the global library only
+  (~/.config/design-distill/<name>/), never to the project root.
   When invoked without arguments, lists all saved design systems.
 argument-hint: "<URL 或本地项目路径>"
+metadata:
+  requires: "dembrandt>=0.18 (optional; native getComputedStyle fallback otherwise) + a browser (system Chrome/Edge, CDP, or Playwright Chromium)"
+  references:
+    - references/template.md
+  promptSignals:
+    phrases:
+      - "distill"
+      - "extract design"
+      - "design tokens"
+      - "design system from"
+      - "reverse engineer design"
+      - "copy the design"
+      - "what colors does"
+      - "what fonts does"
+      - "蒸馏"
+      - "提取设计"
+retrieval:
+  aliases:
+    - distill a design system
+    - extract design tokens from a site
+    - reverse engineer a website's design
+    - build DESIGN.md from a URL
+  intents:
+    - extract a site's real design tokens into a reusable design system
+    - seed a design library from an existing product
+    - capture colors, fonts, spacing, components from a URL or local project
+  examples:
+    - distill linear.app
+    - extract the design system from stripe.com
+    - 蒸馏 https://vercel.com
+    - distill ./my-app
 ---
 
 # Design Distill
 
 ## No-Argument Behavior: List Styles
 
-When invoked without arguments, list all saved styles:
+When invoked without arguments, list all saved styles with agent-native file ops:
 
 ```bash
-design-distill list
+ls -1 ~/.config/design-distill/ 2>/dev/null   # honors $DESIGN_DISTILL_HOME
 ```
 
-If `design-distill` is not found, suggest: "Run `npx design-distill init` to install the CLI globally."
+If the library directory is empty or missing, suggest running `node scripts/setup.mjs` to seed the bundled styles (github, linear, notion, stripe, vercel).
 
 Display the result and ask what the user wants to do next.
 
@@ -32,90 +64,88 @@ If the user provided a URL, use it directly. Otherwise ask:
 - Website URL?
 - Style name? (default: derive from domain, e.g., `https://linear.app` → `linear`)
 
-### Step 2: Check Dependencies
+### Step 2: Bootstrap & Probe
+
+The skill is self-contained — it does **not** depend on any external `/browse` skill. It ships bundled primitives under `scripts/` (run via `node`) backed by a single browser dependency (Playwright/Chromium).
+
+First ensure the environment and learn the capability tier:
 
 ```bash
-npx dembrandt --version 2>/dev/null
+node scripts/setup.mjs --probe       # → { browser, extractor, source, tier }
+# If browser is false and you want visual capture:
+node scripts/setup.mjs               # reuses system Chrome/Edge or a CDP endpoint if present;
+                                     # only downloads Chromium when no browser is found. Also seeds bundled styles.
 ```
 
-#### With dembrandt (preferred)
+The skill reuses a browser you already have — set `DESIGN_DISTILL_CDP=<ws-endpoint>` to attach to a running browser, or just have Chrome/Edge installed. No forced 150MB download when a usable browser exists.
 
-Run extraction and take screenshots in parallel:
+- `tier: "full"` → extract + screenshots (best fidelity)
+- `tier: "token-only"` → extraction only; **tell the user visual validation was skipped**
 
-1. **Extract tokens:**
+### Step 3: Extract Tokens + Capture Pixels
+
+1. **Extract tokens** (source precedence MCP → pinned dembrandt → native fallback, all handled inside the primitive):
    ```bash
-   npx dembrandt <url> --json-only
+   node scripts/extract.mjs <url>      # → stable token-set JSON on stdout
    ```
-   Capture the JSON output — it contains `colors`, `typography`, `spacing`, `borderRadius`, `shadows`, `components`, and more with confidence scores.
+   The JSON contains `colors` (with confidence), `typography`, `spacing`, `radius`, `shadows`, `components`.
 
-2. **Take screenshots for visual ground truth** using `/browse`:
-   - Homepage — observe the real background color (light or dark? don't guess from the brand name)
-   - 1-2 representative subpages (e.g., /pricing, /docs)
+   **Comprehensive capture (opt-in — heavier, only when the request needs it):**
+   ```bash
+   node scripts/extract.mjs <url> --crawl 3   # multiple pages, merged
+   node scripts/extract.mjs <url> --dark-mode # also capture the dark palette (kept as a variant)
+   node scripts/extract.mjs <url> --mobile --slow --cookie "<s>" --header "<h>"
+   ```
+   Cost rule of thumb (each multiplies the dembrandt run): default single-page ≈ 1×; `--crawl N` ≈ N×; `--dark-mode` adds a second full run; `--slow` ≈ 3× timeouts. Default to single-page light unless the task needs breadth.
+
+2. **Capture screenshots for visual ground truth** (full-tier only) with the bundled primitive — **not** `/browse`:
+   ```bash
+   node scripts/screenshot.mjs <url> --out <dir> --viewports desktop,mobile --schemes light
+   ```
+   - Observe the real background color (light or dark? don't guess from the brand name)
+   - Capture 1-2 representative subpages (e.g., /pricing, /docs) by re-running with their URLs
 
 3. **Combine both sources:**
-   - Use dembrandt's exact values (hex colors, px/rem sizes, font names) for the data
+   - Use the extracted exact values (hex colors, px/rem sizes, font names) for the data
    - Use screenshots to validate: overall lightness/darkness, visual density, design personality
    - When they conflict, trust the screenshot
 
-#### Without dembrandt (fallback)
+If the site has `/design`, `/brand`, `/style-guide`, or `/storybook`, capture those too.
 
-Use `/browse` for everything:
+**Screenshots are primary.** On `token-only` tier (no browser), proceed from token data alone and clearly note that visual validation was skipped.
 
-```
-1. Visit the URL, screenshot the full homepage
-2. Screenshot 1-2 subpages
-3. From the screenshots, directly identify:
-   - Background tonality (light/dark/neutral)
-   - Primary text color
-   - CTA button color and shape
-   - Card/panel appearance
-   - Overall layout density
+### Step 4: Normalize + Generate (structured-first)
 
-4. Extract CSS variables via JavaScript:
-   Object.fromEntries(
-     [...document.styleSheets]
-       .flatMap(s => { try { return [...s.cssRules] } catch(e) { return [] } })
-       .filter(r => r.selectorText === ':root' || r.selectorText === 'html')
-       .flatMap(r => [...r.style])
-       .map(v => [v, getComputedStyle(document.documentElement).getPropertyValue(v)])
-   )
+The canonical artifact is a **structured token set** (`tokens.json`); `DESIGN.md` is rendered from it. Pipe the extracted tokens through `build-design`, which applies semantic normalization (raw → roles + decision rules), derives the essence, and renders the document:
 
-5. Sample computed colors from key elements (only if step 4 yields sparse results)
-6. Extract font references from <head> link tags and @import rules
+```bash
+node scripts/extract.mjs <url> \
+  | node scripts/build-design.mjs --name <name> --source-url <url> --out ~/.config/design-distill/<name>
+# writes ~/.config/design-distill/<name>/tokens.json (canonical) + DESIGN.md (view)
 ```
 
-If the site has `/design`, `/brand`, `/style-guide`, or `/storybook`, visit those too.
-
-**Screenshots are primary.** If CSS extraction fails, visual analysis from screenshots alone can produce accurate results.
-
-### Step 3: Generate DESIGN.md
-
-Assemble the document using the structure from `references/template.md`.
+`build-design` records every role assignment / override in `tokens.json.decisions` and the rendered "Normalization decisions" section, so the result is inspectable.
 
 **Key principles:**
-- Every value must be concrete — write `#1a1a2e`, not "a dark blue"
-- Visual judgments (light/dark, personality) come from screenshots, not assumptions
-- Include `source_url` in the header for design-apply to re-screenshot
+- Every value must be concrete — `#1a1a2e`, not "a dark blue"
+- Visual judgments (light/dark, personality) come from screenshots — read them and correct the rendered tone/essence if the data disagrees
+- `tokens.json` is canonical; never hand-edit `DESIGN.md` as the source — re-render it
+- `source_url` is recorded for design-apply to re-screenshot
 
-### Step 4: Save to Global Library Only
+### Step 5: Save to Global Library Only
 
 **Derive default style name:**
 - URL source: extract domain without TLD (e.g., `https://linear.app` → `linear`)
 - Confirm with user
 
-**Check for collision:**
+**Check for collision** with agent-native file ops (the library lives at `~/.config/design-distill/`, overridable via `DESIGN_DISTILL_HOME`):
 ```bash
-design-distill path <name> 2>/dev/null
+ls ~/.config/design-distill/<name>/DESIGN.md 2>/dev/null
 ```
 
 If the style exists, ask: "Style `<name>` already exists. Overwrite or choose a different name?"
 
-**Save:**
-```bash
-design-distill show <name> 2>/dev/null  # verify after save
-```
-
-Write the DESIGN.md to `~/.config/design-distill/<name>/DESIGN.md`:
+**Save** — write the DESIGN.md directly:
 ```bash
 mkdir -p ~/.config/design-distill/<name>
 # Write DESIGN.md content to ~/.config/design-distill/<name>/DESIGN.md
@@ -155,7 +185,7 @@ find . -path "*/components/*" \( -name "Button*" -o -name "Card*" \) | head -5
 
 ### Step 2: Generate and Save
 
-Same as URL flow Step 3-4, but:
+Same as URL flow Step 4-5, but:
 - Style name defaults to directory name (e.g., `./my-app` → `my-app`)
 - No `source_url` in header (local projects don't have one)
 - No screenshots to archive

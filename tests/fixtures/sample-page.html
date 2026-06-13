@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sample</title>
+    <style>
+      :root {
+        --brand: #5e6ad2;
+        --surface: #08090a;
+      }
+      * { margin: 0; box-sizing: border-box; }
+      body {
+        background: var(--surface);
+        color: #f7f8f8;
+        font-family: Inter, system-ui, sans-serif;
+      }
+      .hero { padding: 24px; min-height: 1600px; }
+      .cta {
+        background: var(--brand);
+        color: #fff;
+        padding: 0 12px;
+        border-radius: 6px;
+        border: none;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+      @media (prefers-color-scheme: light) {
+        body { background: #ffffff; color: #08090a; }
+      }
+      .below { margin-top: 1400px; color: #8a8f98; }
+    </style>
+  </head>
+  <body>
+    <main class="hero">
+      <h1>Sample Page</h1>
+      <button class="cta">Get started</button>
+      <p class="below" id="below-fold">Below the fold content</p>
+    </main>
+  </body>
+</html>
