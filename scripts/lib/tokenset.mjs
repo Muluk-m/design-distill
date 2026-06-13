@@ -17,6 +17,16 @@
 
 export const TOKENSET_SCHEMA = "design-distill/tokenset@1";
 
+// Confidence ordering, shared by normalization + merge.
+export const CONFIDENCE_RANK = Object.freeze({ high: 3, medium: 2, low: 1, unknown: 0 });
+
+// Extract the leading number from a CSS length string ("16px (1rem)" → 16).
+export function parsePx(v) {
+  if (v == null) return null;
+  const m = String(v).match(/-?\d*\.?\d+/);
+  return m ? parseFloat(m[0]) : null;
+}
+
 export function emptyTokenSet(source = {}) {
   return {
     schema: TOKENSET_SCHEMA,

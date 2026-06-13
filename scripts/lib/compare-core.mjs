@@ -5,7 +5,7 @@
 // a quantified overall fidelity score (0..100) and pass/fail.
 
 import { deltaE, isColor } from "./color.mjs";
-import { normalizeTokenSet } from "./tokenset.mjs";
+import { normalizeTokenSet, parsePx } from "./tokenset.mjs";
 
 export const DEFAULT_THRESHOLDS = Object.freeze({
   colorDeltaE: 10, // RGB distance below which two colors are "the same"
@@ -22,12 +22,6 @@ const WEIGHTS = Object.freeze({
   shadows: 0.1,
   components: 0.1,
 });
-
-function parsePx(v) {
-  if (v == null) return null;
-  const m = String(v).match(/-?\d*\.?\d+/);
-  return m ? parseFloat(m[0]) : null;
-}
 
 // Collapse whitespace + casing so semantically-equal CSS strings match.
 function normalizeText(s) {

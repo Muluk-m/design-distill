@@ -9,7 +9,7 @@
 // Writes <dir>/tokens.json (canonical) + <dir>/DESIGN.md (view) when --out is
 // given; otherwise prints the structured JSON to stdout.
 
-import { readFileSync, writeFileSync, mkdirSync, readFileSync as rf } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { normalizeSemantics } from "./lib/semantic.mjs";
 import { deriveEssence } from "./lib/essence.mjs";
@@ -19,7 +19,7 @@ import { flagValue, positional } from "./lib/args.mjs";
 
 function readInput(path) {
   if (path && path !== "-") return readFileSync(path, "utf-8");
-  return rf(0, "utf-8"); // stdin
+  return readFileSync(0, "utf-8"); // stdin
 }
 
 function main() {

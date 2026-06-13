@@ -42,21 +42,15 @@ async function main() {
     url = resolveTarget(output).url;
   }
 
-  // Probe for a browser; degrade to token-only (still attempts native/dembrandt
-  // extraction, which needs a browser — so token-only here means "no evidence").
-  const { browserAvailable } = await import("./lib/browser.mjs");
-  const hasBrowser = await browserAvailable();
+  // Probe for a browser; degrade to token-only (native extraction needs a
+  // browser — so token-only here means "no evidence").
+  const browser = await import("./lib/browser.mjs");
+  const hasBrowser = await browser.browserAvailable();
 
-  const runners = {
-    mcp: null,
-    cli: (u) => runDembrandtCli(u),
-    native: hasBrowser
-      ? async (u) => {
-          const { nativeExtract } = await import("./lib/browser.mjs");
-          return mapNativeComputed(await nativeExtract(u), { target: u });
-        }
-      : null,
-  };
+  const runners = { mcp: null, cli: (u) => runDembrandtCli(u) };
+  if (hasBrowser) {
+    runners.native = async (u) => mapNativeComputed(await browser.nativeExtract(u), { target: u });
+  }
   const outputTokens = await extractTokens(url, { runners });
   const report = compareTokenSets(reference, outputTokens, { thresholds: { passScore: threshold } });
   const instructions = deltasToInstructions(report);
@@ -64,8 +58,7 @@ async function main() {
   let evidence = null;
   if (hasBrowser && outDir) {
     mkdirSync(outDir, { recursive: true });
-    const { capture } = await import("./lib/browser.mjs");
-    const shot = await capture(url, { outDir, viewports: [{ name: "output", width: 1280, height: 800 }], schemes: ["light"] }).catch(() => null);
+    const shot = await browser.capture(url, { outDir, viewports: [{ name: "output", width: 1280, height: 800 }], schemes: ["light"] }).catch(() => null);
     writeFileSync(`${outDir}/report.json`, JSON.stringify(report, null, 2) + "\n");
     evidence = { reportPath: `${outDir}/report.json`, images: shot ? shot.images : [] };
   }

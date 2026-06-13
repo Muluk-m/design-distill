@@ -5,9 +5,7 @@
 // merge is inspectable. Light/dark are kept as distinct variants, never
 // flattened.
 
-import { normalizeTokenSet, emptyTokenSet } from "./tokenset.mjs";
-
-const RANK = { high: 3, medium: 2, low: 1, unknown: 0 };
+import { normalizeTokenSet, emptyTokenSet, CONFIDENCE_RANK as RANK } from "./tokenset.mjs";
 
 function mergeColors(target, sources) {
   const seen = {}; // name -> { value, confidence, count }

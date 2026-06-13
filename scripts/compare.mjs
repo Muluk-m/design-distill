@@ -6,11 +6,11 @@
 
 import { readFileSync } from "node:fs";
 import { compareTokenSets } from "./lib/compare-core.mjs";
-import { flagValue } from "./lib/args.mjs";
+import { flagValue, positionals } from "./lib/args.mjs";
 
 function main() {
   const args = process.argv.slice(2);
-  const files = args.filter((a) => !a.startsWith("--"));
+  const files = positionals(args, ["--threshold"]);
   if (files.length < 2) {
     process.stderr.write("usage: compare.mjs <reference.json> <candidate.json> [--threshold N]\n");
     process.exit(2);

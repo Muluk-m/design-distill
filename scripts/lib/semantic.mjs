@@ -3,19 +3,12 @@
 // token set (D3) — raw values are retained; this adds a `semantic` block and a
 // `decisions` log so every assignment/override is inspectable.
 
-import { normalizeTokenSet } from "./tokenset.mjs";
-import { hueFamily, saturation, rgbToHsl, isColor, isOpaque } from "./color.mjs";
+import { normalizeTokenSet, parsePx, CONFIDENCE_RANK } from "./tokenset.mjs";
+import { hueFamily, rgbToHsl, isColor, isOpaque } from "./color.mjs";
 import { contrastRatio } from "./wcag.mjs";
 
 const MODULAR_BASE = 16;
 const MODULAR_RATIO = 1.25;
-const CONFIDENCE_RANK = { high: 3, medium: 2, low: 1, unknown: 0 };
-
-function parsePx(v) {
-  if (v == null) return null;
-  const m = String(v).match(/-?\d*\.?\d+/);
-  return m ? parseFloat(m[0]) : null;
-}
 
 // Nearest step of the modular scale (base 16, ratio 1.25), rounded to integer px.
 export function nearestModularStep(size) {
@@ -37,14 +30,17 @@ function colorEntries(ts) {
   return Object.entries(ts.colors)
     // Skip near-transparent colors (e.g. rgba(...,0)) — overlays, not roles.
     .filter(([, v]) => isOpaque(v.value, 0.4))
-    .map(([name, v]) => ({
-    name,
-    value: v.value,
-    confidence: v.confidence || "unknown",
-    family: hueFamily(v.value),
-    sat: saturation(v.value),
-    l: isColor(v.value) ? rgbToHsl(v.value).l : 0.5,
-  }));
+    .map(([name, v]) => {
+      const hsl = isColor(v.value) ? rgbToHsl(v.value) : { s: 0, l: 0.5 };
+      return {
+        name,
+        value: v.value,
+        confidence: v.confidence || "unknown",
+        family: hueFamily(v.value),
+        sat: hsl.s,
+        l: hsl.l,
+      };
+    });
 }
 
 function assignNeutrals(neutrals, decisions) {
@@ -138,10 +134,9 @@ export function normalizeSemantics(rawTokenSet) {
     roles["color-error"] = error.value;
     decisions.push(`color-error = ${error.value} (red hue, reserved for errors)`);
   }
+  // A distinct amber (never the brand color itself) may serve as warning.
   const amber = chromatic.find((c) => (c.family === "orange" || c.family === "yellow") && c.value !== primary?.value);
-  if (amber && amber.family === primaryFamily && amber.value === primary?.value) {
-    decisions.push("color-warning unset: brand is orange and no distinct amber found (orange cannot double as warning)");
-  } else if (amber) {
+  if (amber) {
     roles["color-warning"] = amber.value;
     decisions.push(`color-warning = ${amber.value} (distinct amber, reserved for warnings)`);
   } else if (primaryFamily === "orange") {
