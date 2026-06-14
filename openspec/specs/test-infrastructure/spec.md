@@ -1,22 +1,20 @@
-## ADDED Requirements
+# test-infrastructure Specification
+
+## Purpose
+Test runner + fixtures for the design-distill skill. Tests run directly against the zero-build bundled scripts (no compilation step).
+
+## Requirements
 
 ### Requirement: Vitest configuration
-The project SHALL have a vitest configuration that runs all `tests/**/*.test.ts` files with ESM and TypeScript support.
+The project SHALL use vitest to run all `tests/**/*.test.ts` files, with no build/globalSetup step (the bundled `.mjs` scripts require no compilation).
 
-#### Scenario: Run all tests
-- **WHEN** developer runs `npm test`
-- **THEN** vitest discovers and executes all test files under `tests/`
+#### Scenario: Run all tests without a build
+- **WHEN** the developer runs `npm test`
+- **THEN** vitest discovers and executes all test files under `tests/` directly against the `.mjs` scripts, with no prior `tsdown` build
 
 ### Requirement: Test fixtures
-The project SHALL include test fixtures in `tests/fixtures/` with at least one real DESIGN.md sample and one minimal DESIGN.md for edge case testing.
+The project SHALL include test fixtures in `tests/fixtures/` (e.g. a sample HTML page) used by the browser-integration tests.
 
 #### Scenario: Fixtures available
-- **WHEN** any test imports a fixture file
-- **THEN** the fixture contains valid DESIGN.md content with known values for assertion
-
-### Requirement: CLI integration test build
-CLI integration tests SHALL automatically build `dist/cli.mjs` before running via vitest globalSetup.
-
-#### Scenario: Fresh clone test run
-- **WHEN** developer runs `npm test` without prior build
-- **THEN** globalSetup runs `tsdown` first, then tests execute against built output
+- **WHEN** a test references a fixture file
+- **THEN** the fixture exists with known values for assertion
